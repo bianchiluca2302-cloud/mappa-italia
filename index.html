@@ -25,7 +25,9 @@
   </div>
   <p id="stat"></p>
   <small>Clic su una tessera: cambia stato. Maiusc+clic sulla mappa: aggiungi un candidato.</small><br>
-  <button id="satellite">Vista satellitare</button>
+  <label for="sfondo"><b>Foto e carte</b></label>
+  <select id="sfondo" style="width:100%"></select>
+  <label>Trasparenza <input type="range" id="opacita" min="10" max="100" value="100" style="width:120px;vertical-align:middle"></label><br>
   <button id="esporta">Esporta JSON</button>
   <button id="azzera">Azzera</button>
 </div>
@@ -56,15 +58,50 @@ const lidarToscana =L.tileLayer.wms('https://www502.regione.toscana.it/wmsraster
   layers: 'rt_morfologia.iddtm.1m.hs.irs', format: 'image/png', transparent: false, minZoom: 11, maxZoom: 19,
   attribution: 'DTM LiDAR © Regione Toscana (CC BY)'
 }).addTo(map);
-// Vista satellitare (Esri World Imagery): tasto nel pannello, sta sopra rilievo e LiDAR ma sotto i punti
-const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {maxZoom: 19, zIndex: 5, attribution: 'Esri World Imagery'});
-document.getElementById('satellite').onclick = e => {
-  const acceso = map.hasLayer(satellite);
-  if (acceso) map.removeLayer(satellite); else map.addLayer(satellite);
-  e.target.textContent = acceso ? 'Vista satellitare' : 'Torna al rilievo';
+// Foto e carte (menu nel pannello): una sola alla volta, sopra rilievo e LiDAR ma sotto i punti; il cursore la rende trasparente
+const WMS_RT = 'https://www502.regione.toscana.it/wmsraster/com.rt.wms.RTmap/wms?map=';
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const wayback = r => `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${r}/{z}/{y}/{x}`;
+const ofc = sigla => L.tileLayer.wms(WMS_RT + 'wmsofc', {layers: 'rt_ofc.10k' + sigla, format: 'image/png', maxZoom: 19, zIndex: 5,
+  attribution: 'Ortofoto © Regione Toscana'});
+const SFONDI = {
+  'Satellite': {
+    'sat':   ['Satellite oggi (Esri)', () => L.tileLayer(ESRI, {maxZoom: 19, zIndex: 5, attribution: 'Esri World Imagery'})],
+    'wb23':  ['Satellite 2023 (Esri Wayback)', () => L.tileLayer(wayback(1034), {maxZoom: 19, maxNativeZoom: 18, zIndex: 5, attribution: 'Esri Wayback'})],
+    'wb20':  ['Satellite 2020 (Esri Wayback)', () => L.tileLayer(wayback(119), {maxZoom: 19, maxNativeZoom: 18, zIndex: 5, attribution: 'Esri Wayback'})],
+    'wb18':  ['Satellite 2018 (Esri Wayback)', () => L.tileLayer(wayback(239), {maxZoom: 19, maxNativeZoom: 18, zIndex: 5, attribution: 'Esri Wayback'})],
+    'wb16':  ['Satellite 2016 (Esri Wayback)', () => L.tileLayer(wayback(388), {maxZoom: 19, maxNativeZoom: 18, zIndex: 5, attribution: 'Esri Wayback'})],
+    'wb14':  ['Satellite 2014 (Esri Wayback)', () => L.tileLayer(wayback(10), {maxZoom: 19, maxNativeZoom: 18, zIndex: 5, attribution: 'Esri Wayback'})]},
+  'Foto aeree storiche (solo Toscana, a macchia)': Object.fromEntries([
+    ['13', '2013'], ['10', '2010'], ['03', '2003'], ['00', '2000'], ['96', '1996'], ['88', '1988'],
+    ['78', '1978'], ['75', '1975'], ['68', '1968'], ['65', '1965'], ['63', '1963'], ['54', '1954']
+  ].map(([s, anno]) => ['ofc' + s, ['Foto aerea ' + anno, () => ofc(s)]])),
+  'Carte antiche': {
+    'ing':   ['Carta geometrica della Toscana (Inghirami, 1830)', () => L.tileLayer.wms(WMS_RT + 'wmscastore',
+      {layers: 'r_toscan_cst_inghirami', format: 'image/png', maxZoom: 19, zIndex: 5, attribution: 'Carta Inghirami © Regione Toscana (Castore)'})]}
 };
-if (new URLSearchParams(location.search).get('s') === '1') document.getElementById('satellite').click(); // ?s=1 apre in satellitare
+// IGM 1:25.000 (Geoportale Nazionale): il server risponde solo in http, quindi online (https) il browser la blocca
+if (location.protocol !== 'https:') SFONDI['Carte antiche']['igm'] = ['IGM 1:25.000 (tutta Italia, solo in locale)',
+  () => L.tileLayer.wms('http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/IGM_25000.map',
+    {layers: 'CB.IGM25000.32,CB.IGM25000.33', format: 'image/png', maxZoom: 19, zIndex: 5, attribution: 'IGM © Geoportale Nazionale'})];
+const sfondo = document.getElementById('sfondo'), opacita = document.getElementById('opacita');
+sfondo.add(new Option('Solo rilievo', ''));
+for (const [gruppo, voci] of Object.entries(SFONDI)) {
+  const og = document.createElement('optgroup'); og.label = gruppo;
+  for (const [k, [nome]] of Object.entries(voci)) og.appendChild(new Option(nome, k));
+  sfondo.add(og);
+}
+let sfondoAcceso = null;
+sfondo.onchange = () => {
+  if (sfondoAcceso) map.removeLayer(sfondoAcceso);
+  sfondoAcceso = null;
+  const voce = Object.values(SFONDI).map(g => g[sfondo.value]).find(Boolean);
+  if (voce) { sfondoAcceso = voce[1]().setOpacity(opacita.value / 100); map.addLayer(sfondoAcceso); }
+};
+opacita.oninput = () => { if (sfondoAcceso) sfondoAcceso.setOpacity(opacita.value / 100); };
+if (new URLSearchParams(location.search).get('s') === '1') { sfondo.value = 'sat'; sfondo.onchange(); } // ?s=1 apre in satellitare
+const fotoUrl = new URLSearchParams(location.search).get('f'); // ?f=ofc54 apre con quella foto/carta
+if (fotoUrl && [...sfondo.options].some(o => o.value === fotoUrl)) { sfondo.value = fotoUrl; sfondo.onchange(); }
 // Siti noti (OpenStreetMap, scaricati con tools/scarica_siti_noti.py): servono a scartare i falsi positivi
 const sitiNoti = L.layerGroup(SITI_NOTI.map(s =>
   L.circleMarker([s.lat, s.lon], {radius: 5, color: '#c0392b', weight: 1.5, fillColor: '#fff', fillOpacity: .9})
@@ -91,12 +128,12 @@ tuttiCandidati.forEach(c => L.circleMarker([c.lat, c.lon],
     ${c.foglio ? `<a href="${c.foglio}" target="_blank">Vedi rilievo, DSM, foto 2013 e 1954</a><br>` : ''}
     <i>Sito noto più vicino: ${c.noto_vicino.nome || c.noto_vicino.tipo} a ${c.noto_vicino.metri} m</i>`)
   .addTo(scansione));
+const griglia = L.layerGroup(); // griglia 0,25 gradi: spenta di default, si accende dal menu
 L.control.layers(null, {'LiDAR Toscana 1 m': lidarToscana, 'Copertura 1 m': copertura, 'Scansione (tessere e candidati)': scansione,
     'Griglia 0,25°': griglia, 'Siti noti (OSM)': sitiNoti, 'Siti noti (Wikidata)': sitiWikidata},
   {collapsed: false, position: 'bottomright'}).addTo(map);
 
 const rettangoli = {};
-const griglia = L.layerGroup(); // griglia 0,25 gradi: spenta di default, si accende dal menu
 function stile(id) {
   const s = stato.tessere[id] || 0;
   return {color: COLORI[s], weight: 0.5, fillColor: COLORI[s], fillOpacity: s ? 0.25 : 0.05};

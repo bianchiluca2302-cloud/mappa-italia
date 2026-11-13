@@ -38,10 +38,12 @@ def main():
     for r in range(righe):
         for c in range(colonne):
             lat, lon = lat0 + r * PASSO_LAT, lon0 + c * dlon
-            dati = scarica(lat, lon, dlon)
             nome = cartella / f'{lat:.4f}_{lon:.4f}.png'
+            if nome.exists():
+                continue
+            dati = scarica(lat, lon, dlon)
             nome.write_bytes(dati)
-            print(nome.name, len(dati))
+            print(nome.name, len(dati), 'VUOTA' if len(dati) < 20_000 else '')
 
 
 if __name__ == '__main__':
