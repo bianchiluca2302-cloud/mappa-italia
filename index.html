@@ -52,6 +52,7 @@
       <div><i class="s" style="border-color:#c0392b"></i>sito noto (OpenStreetMap)</div>
       <div><i class="s" style="border-color:#2471a3"></i>sito noto (Wikidata)</div>
     </div>
+    <label><input type="checkbox" id="soloNuovi"> Solo reperti nuovi (nascondi siti noti e scartati)</label>
     <p id="stat"></p>
     <p id="aiuto"></p>
     <div>
@@ -159,12 +160,12 @@ SCANSIONE.tessere.forEach(t => L.rectangle([[t.lat, t.lon], [t.lat + DLAT, t.lon
   {color: '#27ae60', weight: 1, fillOpacity: .12, interactive: false}).addTo(scansione));
 // candidati nuovi: solo in locale (dati/scansione-privata.js non e versionato, online il file manca)
 const tuttiCandidati = SCANSIONE.candidati.concat(typeof SCANSIONE_PRIVATA === 'undefined' ? [] : SCANSIONE_PRIVATA);
-tuttiCandidati.forEach(c => L.circleMarker([c.lat, c.lon],
+const marcatori = tuttiCandidati.map(c => ({c, m: L.circleMarker([c.lat, c.lon],
   {radius: 9, color: '#000', weight: 2, fillColor: COL_AFF[c.affidabilita], fillOpacity: 1})
   .bindPopup(`<b>${c.id} · ${c.affidabilita}</b><br>${c.nota}<br>${c.verifica ? '<b>Verifica:</b> ' + c.verifica + '<br>' : ''}
     ${c.foglio ? `<a href="${c.foglio}" target="_blank">Vedi rilievo, DSM, foto 2013 e 1954</a><br>` : ''}
     <i>Sito noto più vicino: ${c.noto_vicino.nome || c.noto_vicino.tipo} a ${c.noto_vicino.metri} m</i>`)
-  .addTo(scansione));
+  .addTo(scansione)}));
 const griglia = L.layerGroup(); // griglia 0,25 gradi: spenta di default, si accende dal menu
 const piccolo = matchMedia('(max-width:600px)').matches; // su telefono i livelli stanno in un'icona in alto a sinistra
 L.control.layers(null, {'LiDAR Toscana 1 m': lidarToscana, 'Copertura 1 m': copertura, 'Scansione (tessere e candidati)': scansione,
@@ -190,6 +191,14 @@ for (let lat = LAT0; lat < LAT1; lat += PASSO) {
   }
 }
 
+// Filtro "solo nuovi": candidati non gia noti ne scartati, senza i siti noti di OSM e Wikidata
+const NON_NUOVI = ['gia noto', 'scartato'];
+document.getElementById('soloNuovi').onchange = () => {
+  const on = document.getElementById('soloNuovi').checked;
+  marcatori.forEach(({c, m}) => { if (NON_NUOVI.includes(c.affidabilita)) on ? scansione.removeLayer(m) : scansione.addLayer(m); });
+  [sitiNoti, sitiWikidata].forEach(g => on ? map.removeLayer(g) : map.addLayer(g));
+  document.getElementById('msg').textContent = on ? `Mostro solo i ${marcatori.filter(({c}) => !NON_NUOVI.includes(c.affidabilita)).length} candidati nuovi.` : '';
+};
 function aggiungiCandidato(c) {
   L.circleMarker([c.lat, c.lon], {radius: 7, color: '#e80', fillOpacity: .8})
     .bindPopup(c.nota || 'candidato').addTo(map);

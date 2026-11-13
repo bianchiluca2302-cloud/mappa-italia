@@ -12,7 +12,7 @@
 - Fonti storiche https che funzionano (Geoscopio): CTR 10k (`owsctr`), IGM 25k primo '900 (`rt_ctr.igm.q25`), ortofoto 1975/78/88/96/2007 e le altre di `wmsofc`; catasto d'impianto solo Grosseto. Vuote: ortofoto 1963, Leopoldino.
 - Sito: pannello richiudibile, ricerca luogo/coordinate, zone, legenda vera, "Segna un punto" al tocco, link alla vista. Provato in locale (porta 8791; la 8765 e di LokiOS), niente errori in console.
 
-**Prossimi passi (in ordine)**: (1) il sito e gia pubblicato; (2) controllare U2 e U3 con OSM, carte storiche e tumuli noti vicini (U2 a 435 m da Poggio Gaiella); (3) mettere la regola C nel codice della pipeline; (4) scansionare zone nuove con tumuli/necropoli noti poco coperte (Amiata, Casentino, Cetona) con la regola C; (5) capire M2 (manufatto dopo il 1978) e il toponimo "Castel..." di M1 nei cataloghi.
+**Prossimi passi (in ordine)**: (1) il sito e gia pubblicato; (2) controllare U2 e U3 con OSM, carte storiche e tumuli noti vicini (U2 a 435 m da Poggio Gaiella); (3) FATTO 2026-11-13: la regola C e in `pipeline_blocco.py` (flag `regola_c`, in testa alla lista dopo i `gia_noto`; su pipeline.json esistenti da 13 punti nuovi a Marmini e 9 a Sovana, non ancora guardati). Sito: aggiunta la casella "Solo reperti nuovi" (nasconde gia noto, scartati, siti OSM e Wikidata); pubblicata; (4) scansionare zone nuove con tumuli/necropoli noti poco coperte (Amiata, Casentino, Cetona) con la regola C; (5) capire M2 (manufatto dopo il 1978) e il toponimo "Castel..." di M1 nei cataloghi.
 
 ## Stato candidati (tutti PRIVATI tranne i pubblici gia in `scansione.js`)
 - Coordinate solo in `dati/scansione.json`, `dati/scansione-privata.js`, `dati/viste/ID_*` (mai sul repo pubblico, nemmeno qui).

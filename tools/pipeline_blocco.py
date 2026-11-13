@@ -6,6 +6,7 @@ dati/blocchi/NOME/ (ignorato dal git: contiene coordinate): pipeline.json, con i
 (prima quelli in bosco, poi in aperto; dentro ogni gruppo per punteggio), e fogli_rilievo/NN.png, il 2x2
 (una luce, 8 luci, rilievo locale, SVF; finestra 200 m) dei primi MAX_FOGLI punti, NN = posizione in lista.
 I punti vicini a siti OSM o ad aree vincolate (vincoli_arch.py) restano in fondo alla lista col flag gia_noto.
+Regola C (coerenza<=0,3, punteggio>=0,5, raggio>=20 m) = flag regola_c, in testa alla lista dopo i gia_noto in fondo.
 Esclusi: punti su opere moderne di OSM e punti "piatti" (laghetti, piazzali: DTM interno liscio, vedi uso_suolo.py).
 Servono numpy, scipy e Pillow.
 """
@@ -48,6 +49,11 @@ def fondi_doppioni(punti):
     return tenuti
 
 
+def regola_c(p):
+    """Regola C: punti da guardare per primi (tumuli grandi e coerenti, ~0,4 punti/km2)."""
+    return p['coerenza'] <= 0.3 and p['punteggio'] >= 0.5 and p['raggio'] >= 20
+
+
 def main():
     args = [a for a in sys.argv[1:] if a != '--rifai']
     rifai = '--rifai' in sys.argv
@@ -84,7 +90,9 @@ def main():
     for p in buoni:
         if (p.get('vincolo_m') is not None and p['vincolo_m'] < 100) or p.get('noto_vicino'):
             p['gia_noto'] = True
-    buoni.sort(key=lambda p: (p.get('gia_noto', False), p['classe'] != 'bosco', -p['punteggio']))
+    for p in buoni:
+        p['regola_c'] = regola_c(p)
+    buoni.sort(key=lambda p: (p.get('gia_noto', False), not p['regola_c'], p['classe'] != 'bosco', -p['punteggio']))
     (cart / 'fogli_rilievo').mkdir(exist_ok=True)
 
     def disegna(ip):
@@ -103,9 +111,10 @@ def main():
         conto[p['classe']] = conto.get(p['classe'], 0) + 1
     print(f'{nome}: {len(punti)} rilevati -> {len(tenuti)} dopo OSM -> {len(usati)} valutati '
           f'-> {len(buoni)} dopo scarto piatti {conto}; fogli per i primi {min(max_fogli, len(buoni))}')
+    print(f"regola C: {sum(p['regola_c'] and not p.get('gia_noto') for p in buoni)} punti nuovi da guardare")
     for p in buoni[:10]:
         print(f"  #{p['posizione']:02d} {p['classe']:6s} punteggio {p['punteggio']:.2f} raggio {p['raggio']} m"
-              + (' GIA NOTO' if p.get('gia_noto') else ''))
+              + (' REGOLA C' if p['regola_c'] else '') + (' GIA NOTO' if p.get('gia_noto') else ''))
 
 
 if __name__ == '__main__':
