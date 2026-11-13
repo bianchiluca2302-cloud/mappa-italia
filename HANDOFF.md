@@ -32,6 +32,11 @@
 - Licenza: la scheda del layer hillshade dice CC BY-NC-SA (non commerciale, stessa licenza); la scheda del catalogo diceva CC BY. Uso personale ok; mai usarlo a scopo commerciale e citare la fonte.
 - Prossimo miglioramento: automatizzare il confronto con la foto 1954 per scartare in serie, e allargare le tessere.
 
+## Pubblicazione (2026-11-13)
+- Online su GitHub Pages: https://bianchiluca2302-cloud.github.io/mappa-italia/ (repo pubblico `bianchiluca2302-cloud/mappa-italia`, ramo main, cartella radice). Per aggiornare: commit e push, la pagina si rifa in ~1 minuto. Prima di ogni push chiedere a Luca.
+- Non pubblicati (`.gitignore`): `dati/tessere/` e `schermate/`. Pubblicati i fogli di confronto in `dati/viste/` (dati CC BY-NC-SA con fonte citata).
+- Regola: coordinate di candidati NUOVI mai sul repo pubblico; oggi ci sono solo un sito noto e tre scartati.
+
 ## Da fare, in ordine
 1. Fonte dati LiDAR/DTM italiana: Geoportale Nazionale (PST, DTM 1-2 m, copertura parziale) e geoportali regionali
    (Toscana, Emilia-Romagna, Veneto, Lombardia, Piemonte, Friuli...). Verificare licenza e come scaricare a tessere.
