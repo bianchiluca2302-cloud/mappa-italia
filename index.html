@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mappa Italia — anomalie da LiDAR</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html,body{margin:0;height:100%;font:14px system-ui,sans-serif}
+  #map{position:absolute;inset:0}
+  #pannello{position:absolute;z-index:1000;top:10px;right:10px;width:250px;background:#fffd;padding:10px;border-radius:8px;box-shadow:0 2px 8px #0004}
+  #pannello h1{font-size:15px;margin:0 0 6px}
+  #pannello button{margin:2px 2px 0 0}
+  .leg i{display:inline-block;width:12px;height:12px;margin-right:4px;vertical-align:-2px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="pannello">
+  <h1>Mappa Italia — anomalie</h1>
+  <div class="leg">
+    <div><i style="background:#888"></i>da scansionare</div>
+    <div><i style="background:#3a7"></i>scansionata, niente</div>
+    <div><i style="background:#e80"></i>c'è un candidato</div>
+  </div>
+  <p id="stat"></p>
+  <small>Clic su una tessera: cambia stato. Maiusc+clic sulla mappa: aggiungi un candidato.</small><br>
+  <button id="esporta">Esporta JSON</button>
+  <button id="azzera">Azzera</button>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="dati/siti-noti.js"></script>
+<script src="dati/siti-wikidata.js"></script>
+<script src="dati/scansione.js"></script>
+<script>
+const LAT0 = 36.6, LAT1 = 47.1, LON0 = 6.6, LON1 = 18.6, PASSO = 0.25;
+const STATI = ['da scansionare', 'scansionata', 'candidato'];
+const COLORI = ['#888', '#3a7', '#e80'];
+const CHIAVE = 'mappa-italia-stato';
+const stato = JSON.parse(localStorage.getItem(CHIAVE) || '{"tessere":{},"candidati":[]}');
+const salva = () => localStorage.setItem(CHIAVE, JSON.stringify(stato));
+
+const TOSCANA = [[42.23, 9.68], [44.47, 12.37]];
+const map = L.map('map').fitBounds(TOSCANA);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+  {maxZoom: 16, attribution: 'Esri World Hillshade'}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {maxZoom: 19, opacity: 0.35, attribution: '© OpenStreetMap'}).addTo(map);
+// LiDAR Toscana: DTM 1 m ombreggiato (Geoscopio, Regione Toscana, CC BY), si vede da zoom 11 in su
+// index.html?v=lat,lon,zoom apre la mappa gia centrata li
+const vista = new URLSearchParams(location.search).get('v');
+if (vista) { const [la, lo, z] = vista.split(',').map(Number); map.setView([la, lo], z); }
+const lidarToscana =L.tileLayer.wms('https://www502.regione.toscana.it/wmsraster/com.rt.wms.RTmap/wms?map=wmsmorfologia', {
+  layers: 'rt_morfologia.iddtm.1m.hs.irs', format: 'image/png', transparent: false, minZoom: 11, maxZoom: 19,
+  attribution: 'DTM LiDAR © Regione Toscana (CC BY)'
+}).addTo(map);
+// Siti noti (OpenStreetMap, scaricati con tools/scarica_siti_noti.py): servono a scartare i falsi positivi
+const sitiNoti = L.layerGroup(SITI_NOTI.map(s =>
+  L.circleMarker([s.lat, s.lon], {radius: 5, color: '#c0392b', weight: 1.5, fillColor: '#fff', fillOpacity: .9})
+    .bindPopup(`<b>${s.nome || 'sito senza nome'}</b><br>${s.tipo}${s.periodo ? ' · ' + s.periodo : ''}<br>
+      <a href="https://www.openstreetmap.org/${s.osm}" target="_blank">OSM ${s.osm}</a>`))).addTo(map);
+// Siti noti da Wikidata (tools/scarica_siti_wikidata.py): molti coincidono con quelli OSM, qui in blu
+const sitiWikidata = L.layerGroup(SITI_WIKIDATA.map(s =>
+  L.circleMarker([s.lat, s.lon], {radius: 4, color: '#2471a3', weight: 1.5, fillColor: '#fff', fillOpacity: .9})
+    .bindPopup(`<b>${s.nome || 'sito senza nome'}</b><br>${s.tipo}<br>
+      <a href="https://www.wikidata.org/wiki/${s.wikidata}" target="_blank">Wikidata ${s.wikidata}</a>`))).addTo(map);
+// Dove c'e il LiDAR a 1 m (immagine di tutta la Toscana, dati/copertura-1m.png)
+const copertura = L.imageOverlay('dati/copertura-1m.png', TOSCANA, {opacity: .55});
+// Scansione: tessere guardate (verde) e candidati segnalati (dati/scansione.json, scritto da tools/registra_scansione.py)
+const COL_AFF = {'media': '#e67e22', 'bassa': '#f1c40f', 'molto bassa': '#95a5a6', 'gia noto': '#2e86c1', 'scartato': '#95a5a6'};
+const scansione = L.layerGroup().addTo(map);
+const DLAT = 1000 / 111000, DLON = 1000 / (111000 * Math.cos(42.9 * Math.PI / 180));
+SCANSIONE.tessere.forEach(t => L.rectangle([[t.lat, t.lon], [t.lat + DLAT, t.lon + DLON]],
+  {color: '#27ae60', weight: 1, fillOpacity: .12, interactive: false}).addTo(scansione));
+SCANSIONE.candidati.forEach(c => L.circleMarker([c.lat, c.lon],
+  {radius: 9, color: '#000', weight: 2, fillColor: COL_AFF[c.affidabilita], fillOpacity: 1})
+  .bindPopup(`<b>${c.id} · ${c.affidabilita}</b><br>${c.nota}<br>${c.verifica ? '<b>Verifica:</b> ' + c.verifica + '<br>' : ''}
+    ${c.foglio ? `<a href="${c.foglio}" target="_blank">Vedi rilievo, DSM, foto 2013 e 1954</a><br>` : ''}
+    <i>Sito noto più vicino: ${c.noto_vicino.nome || c.noto_vicino.tipo} a ${c.noto_vicino.metri} m</i>`)
+  .addTo(scansione));
+L.control.layers(null, {'LiDAR Toscana 1 m': lidarToscana, 'Copertura 1 m': copertura, 'Scansione (tessere e candidati)': scansione,
+    'Griglia 0,25°': griglia, 'Siti noti (OSM)': sitiNoti, 'Siti noti (Wikidata)': sitiWikidata},
+  {collapsed: false, position: 'bottomright'}).addTo(map);
+
+const rettangoli = {};
+const griglia = L.layerGroup(); // griglia 0,25 gradi: spenta di default, si accende dal menu
+function stile(id) {
+  const s = stato.tessere[id] || 0;
+  return {color: COLORI[s], weight: 0.5, fillColor: COLORI[s], fillOpacity: s ? 0.25 : 0.05};
+}
+for (let lat = LAT0; lat < LAT1; lat += PASSO) {
+  for (let lon = LON0; lon < LON1; lon += PASSO) {
+    const id = lat.toFixed(2) + ',' + lon.toFixed(2);
+    const r = L.rectangle([[lat, lon], [lat + PASSO, lon + PASSO]], stile(id)).addTo(griglia);
+    r.bindTooltip(id);
+    r.on('click', e => {
+      if (e.originalEvent.shiftKey) return;
+      stato.tessere[id] = ((stato.tessere[id] || 0) + 1) % STATI.length;
+      r.setStyle(stile(id)); salva(); conta();
+    });
+    rettangoli[id] = r;
+  }
+}
+
+function aggiungiCandidato(c) {
+  L.circleMarker([c.lat, c.lon], {radius: 7, color: '#e80', fillOpacity: .8})
+    .bindPopup(c.nota || 'candidato').addTo(map);
+}
+stato.candidati.forEach(aggiungiCandidato);
+map.on('click', e => {
+  if (!e.originalEvent.shiftKey) return;
+  const nota = prompt('Nota sul candidato (cosa si vede nel rilievo):') || '';
+  const c = {lat: +e.latlng.lat.toFixed(5), lon: +e.latlng.lng.toFixed(5), nota};
+  stato.candidati.push(c); aggiungiCandidato(c); salva(); conta();
+});
+
+function conta() {
+  const n = Object.keys(rettangoli).length;
+  const fatte = Object.values(stato.tessere).filter(v => v > 0).length;
+  document.getElementById('stat').textContent =
+    `${fatte}/${n} tessere viste · ${stato.candidati.length} candidati`;
+}
+conta();
+document.getElementById('esporta').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(stato, null, 1)], {type: 'application/json'}));
+  a.download = 'mappa-italia-stato.json'; a.click();
+};
+document.getElementById('azzera').onclick = () => {
+  if (confirm('Azzerare tutto?')) { localStorage.removeItem(CHIAVE); location.reload(); }
+};
+</script>
+</body>
+</html>
