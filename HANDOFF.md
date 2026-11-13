@@ -2,7 +2,7 @@
 
 ## RIPARTENZA (leggi prima questo) — aggiornato 2026-11-13 (fine sessione lunga)
 **Obiettivo:** replicare sull'Italia il video TikTok (AI trova rovine da LiDAR): scansionare a tessere il LiDAR aperto, segnalare anomalie, scartare i falsi positivi con foto storiche, verificare, avvisare la Soprintendenza. Si lavora sulla Toscana.
-**Sito online:** https://bianchiluca2302-cloud.github.io/mappa-italia/ (repo pubblico `bianchiluca2302-cloud/mappa-italia`). Ultimo push `eb5482b` (HANDOFF e .gitignore). **NON ancora pushato (in locale):** `index.html` (sito piu intuitivo), `dati/scansione.js` (+230 tessere dei blocchi del rilevatore, 1644 in tutto), questo HANDOFF. Push solo dopo ok esplicito di Luca, ogni volta (l'ultima domanda a Luca: "pubblico? 1 push, 2 prima provo io": senza risposta).
+**Sito online:** https://bianchiluca2302-cloud.github.io/mappa-italia/ (repo pubblico `bianchiluca2302-cloud/mappa-italia`). Ultimo push `be9180c` (sito piu intuitivo, 1644 tessere, HANDOFF), online e verificato il 2026-11-13: tutto pubblicato, niente in locale da pushare. Push solo dopo ok esplicito di Luca, ogni volta (l'ultima domanda a Luca: "pubblico? 1 push, 2 prima provo io": senza risposta).
 
 **Stato in breve**
 - Rilevatore (`tools/pipeline_blocco.py`: quote -> rilevatore -> filtro OSM -> uso suolo -> fusione doppioni -> lista) ritrova i **tumuli grandi** (raggio >=20 m): 5 tumuli noti trovati su ~15 nei blocchi con dato (Montagnola, 2 Meloni del Sodo, Pietrera, Poggio Pelliccia); i piccoli (Tanelle, tumuli di Quinto) no.
@@ -12,7 +12,7 @@
 - Fonti storiche https che funzionano (Geoscopio): CTR 10k (`owsctr`), IGM 25k primo '900 (`rt_ctr.igm.q25`), ortofoto 1975/78/88/96/2007 e le altre di `wmsofc`; catasto d'impianto solo Grosseto. Vuote: ortofoto 1963, Leopoldino.
 - Sito: pannello richiudibile, ricerca luogo/coordinate, zone, legenda vera, "Segna un punto" al tocco, link alla vista. Provato in locale (porta 8791; la 8765 e di LokiOS), niente errori in console.
 
-**Prossimi passi (in ordine)**: (1) chiedere a Luca se pubblicare il sito (push di index.html + scansione.js + HANDOFF); (2) controllare U2 e U3 con OSM, carte storiche e tumuli noti vicini (U2 a 435 m da Poggio Gaiella); (3) mettere la regola C nel codice della pipeline; (4) scansionare zone nuove con tumuli/necropoli noti poco coperte (Amiata, Casentino, Cetona) con la regola C; (5) capire M2 (manufatto dopo il 1978) e il toponimo "Castel..." di M1 nei cataloghi.
+**Prossimi passi (in ordine)**: (1) il sito e gia pubblicato; (2) controllare U2 e U3 con OSM, carte storiche e tumuli noti vicini (U2 a 435 m da Poggio Gaiella); (3) mettere la regola C nel codice della pipeline; (4) scansionare zone nuove con tumuli/necropoli noti poco coperte (Amiata, Casentino, Cetona) con la regola C; (5) capire M2 (manufatto dopo il 1978) e il toponimo "Castel..." di M1 nei cataloghi.
 
 ## Stato candidati (tutti PRIVATI tranne i pubblici gia in `scansione.js`)
 - Coordinate solo in `dati/scansione.json`, `dati/scansione-privata.js`, `dati/viste/ID_*` (mai sul repo pubblico, nemmeno qui).
