@@ -5,6 +5,7 @@ I passi gia fatti (quote.npy, rilevati.json, filtrati.json) si saltano, salvo --
 dati/blocchi/NOME/ (ignorato dal git: contiene coordinate): pipeline.json, con i punti da guardare in ordine
 (prima quelli in bosco, poi in aperto; dentro ogni gruppo per punteggio), e fogli_rilievo/NN.png, il 2x2
 (una luce, 8 luci, rilievo locale, SVF; finestra 200 m) dei primi MAX_FOGLI punti, NN = posizione in lista.
+I punti vicini a siti OSM o ad aree vincolate (vincoli_arch.py) restano in fondo alla lista col flag gia_noto.
 Esclusi: punti su opere moderne di OSM e punti "piatti" (laghetti, piazzali: DTM interno liscio, vedi uso_suolo.py).
 Servono numpy, scipy e Pillow.
 """
@@ -18,6 +19,7 @@ QUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(QUI))
 from rilievo_dtm import foglio  # noqa: E402
 from uso_suolo import classe, indicatori  # noqa: E402
+from vincoli_arch import distanza_vincolo  # noqa: E402
 
 RADICE = QUI.parent
 MAX_USO = 200
@@ -54,6 +56,7 @@ def main():
         try:
             p['suolo'] = indicatori(p['lat'], p['lon'], p['raggio'])
             p['classe'] = classe(p['suolo'])
+            p['vincolo_m'] = distanza_vincolo(p['lat'], p['lon'])
         except Exception as e:
             p['classe'] = 'sconosciuto'
             print('uso del suolo non riuscito:', e)
@@ -62,7 +65,10 @@ def main():
     with ThreadPoolExecutor(3) as ex:
         usati = list(ex.map(suolo, usati))
     buoni = [p for p in usati if p['classe'] != 'piatto']
-    buoni.sort(key=lambda p: (p['classe'] != 'bosco', -p['punteggio']))
+    for p in buoni:
+        if (p.get('vincolo_m') is not None and p['vincolo_m'] < 100) or p.get('noto_vicino'):
+            p['gia_noto'] = True
+    buoni.sort(key=lambda p: (p.get('gia_noto', False), p['classe'] != 'bosco', -p['punteggio']))
     (cart / 'fogli_rilievo').mkdir(exist_ok=True)
 
     def disegna(ip):
@@ -83,7 +89,7 @@ def main():
           f'-> {len(buoni)} dopo scarto piatti {conto}; fogli per i primi {min(max_fogli, len(buoni))}')
     for p in buoni[:10]:
         print(f"  #{p['posizione']:02d} {p['classe']:6s} punteggio {p['punteggio']:.2f} raggio {p['raggio']} m"
-              + (f" NOTO ({p['noto_vicino']['nome'][:30]})" if 'noto_vicino' in p else ''))
+              + (' GIA NOTO' if p.get('gia_noto') else ''))
 
 
 if __name__ == '__main__':

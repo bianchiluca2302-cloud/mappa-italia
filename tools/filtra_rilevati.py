@@ -33,16 +33,16 @@ nwr["historic"]({b}); nwr["site_type"]({b}); nwr["tourism"="viewpoint"]({b});
 out center tags;"""
 
 
-def overpass(query, tentativi=6):
+def overpass(query, tentativi=3):
     dati = urllib.parse.urlencode({'data': query}).encode()
     for t in range(tentativi):
         req = urllib.request.Request(ENDPOINTS[t % 2], dati, {'User-Agent': 'MappaItalia/0.1 (uso personale)'})
         try:
-            with urllib.request.urlopen(req, timeout=240) as r:
+            with urllib.request.urlopen(req, timeout=90) as r:
                 return json.load(r)
         except Exception as e:
             print('overpass:', e)
-            time.sleep(10 * (t + 1))
+            time.sleep(5 * (t + 1))
     raise SystemExit('Overpass non risponde')
 
 
