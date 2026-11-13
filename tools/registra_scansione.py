@@ -1,7 +1,7 @@
 """Scrive dati/scansione.js (tessere viste e candidati) leggendo dati/scansione.json, a mano o da Claude.
 
 Uso: python -I tools/registra_scansione.py
-Per ogni candidato calcola il sito noto piu vicino (OSM e Wikidata) cosi si vede subito se e gia censito.
+scansione.json resta locale (non versionato). Per ogni candidato calcola il sito noto piu vicino (OSM e Wikidata) cosi si vede subito se e gia censito.
 """
 import json
 import math
@@ -24,7 +24,11 @@ def main():
         m, s = min(((metri((c['lat'], c['lon']), (x['lat'], x['lon'])), x) for x in noti), key=lambda t: t[0])
         c['noto_vicino'] = {'metri': round(m), 'nome': s.get('nome', ''), 'tipo': s.get('tipo', '')}
     (D / 'scansione.json').write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding='utf-8')
-    (D / 'scansione.js').write_text('var SCANSIONE = ' + json.dumps(reg, ensure_ascii=False) + ';\n', encoding='utf-8')
+    # scansione.js e pubblico; i candidati con "privato": true vanno solo in scansione-privata.js (non versionato)
+    pubblico = dict(reg, candidati=[c for c in reg['candidati'] if not c.get('privato')])
+    privati = [c for c in reg['candidati'] if c.get('privato')]
+    (D / 'scansione.js').write_text('var SCANSIONE = ' + json.dumps(pubblico, ensure_ascii=False) + ';\n', encoding='utf-8')
+    (D / 'scansione-privata.js').write_text('var SCANSIONE_PRIVATA = ' + json.dumps(privati, ensure_ascii=False) + ';\n', encoding='utf-8')
     for c in reg['candidati']:
         print(c['id'], c['affidabilita'], c['noto_vicino'])
 

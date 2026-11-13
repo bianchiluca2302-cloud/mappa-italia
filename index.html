@@ -25,6 +25,7 @@
   </div>
   <p id="stat"></p>
   <small>Clic su una tessera: cambia stato. Maiusc+clic sulla mappa: aggiungi un candidato.</small><br>
+  <button id="satellite">Vista satellitare</button>
   <button id="esporta">Esporta JSON</button>
   <button id="azzera">Azzera</button>
 </div>
@@ -32,6 +33,7 @@
 <script src="dati/siti-noti.js"></script>
 <script src="dati/siti-wikidata.js"></script>
 <script src="dati/scansione.js"></script>
+<script src="dati/scansione-privata.js" onerror="void 0"></script>
 <script>
 const LAT0 = 36.6, LAT1 = 47.1, LON0 = 6.6, LON1 = 18.6, PASSO = 0.25;
 const STATI = ['da scansionare', 'scansionata', 'candidato'];
@@ -54,6 +56,15 @@ const lidarToscana =L.tileLayer.wms('https://www502.regione.toscana.it/wmsraster
   layers: 'rt_morfologia.iddtm.1m.hs.irs', format: 'image/png', transparent: false, minZoom: 11, maxZoom: 19,
   attribution: 'DTM LiDAR © Regione Toscana (CC BY)'
 }).addTo(map);
+// Vista satellitare (Esri World Imagery): tasto nel pannello, sta sopra rilievo e LiDAR ma sotto i punti
+const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {maxZoom: 19, zIndex: 5, attribution: 'Esri World Imagery'});
+document.getElementById('satellite').onclick = e => {
+  const acceso = map.hasLayer(satellite);
+  if (acceso) map.removeLayer(satellite); else map.addLayer(satellite);
+  e.target.textContent = acceso ? 'Vista satellitare' : 'Torna al rilievo';
+};
+if (new URLSearchParams(location.search).get('s') === '1') document.getElementById('satellite').click(); // ?s=1 apre in satellitare
 // Siti noti (OpenStreetMap, scaricati con tools/scarica_siti_noti.py): servono a scartare i falsi positivi
 const sitiNoti = L.layerGroup(SITI_NOTI.map(s =>
   L.circleMarker([s.lat, s.lon], {radius: 5, color: '#c0392b', weight: 1.5, fillColor: '#fff', fillOpacity: .9})
@@ -67,12 +78,14 @@ const sitiWikidata = L.layerGroup(SITI_WIKIDATA.map(s =>
 // Dove c'e il LiDAR a 1 m (immagine di tutta la Toscana, dati/copertura-1m.png)
 const copertura = L.imageOverlay('dati/copertura-1m.png', TOSCANA, {opacity: .55});
 // Scansione: tessere guardate (verde) e candidati segnalati (dati/scansione.json, scritto da tools/registra_scansione.py)
-const COL_AFF = {'media': '#e67e22', 'bassa': '#f1c40f', 'molto bassa': '#95a5a6', 'gia noto': '#2e86c1', 'scartato': '#95a5a6'};
+const COL_AFF = {'media': '#e67e22', 'bassa': '#f1c40f', 'molto bassa': '#95a5a6', 'gia noto': '#2e86c1', 'scartato': '#95a5a6', 'da verificare - media': '#e67e22'};
 const scansione = L.layerGroup().addTo(map);
 const DLAT = 1000 / 111000, DLON = 1000 / (111000 * Math.cos(42.9 * Math.PI / 180));
 SCANSIONE.tessere.forEach(t => L.rectangle([[t.lat, t.lon], [t.lat + DLAT, t.lon + DLON]],
   {color: '#27ae60', weight: 1, fillOpacity: .12, interactive: false}).addTo(scansione));
-SCANSIONE.candidati.forEach(c => L.circleMarker([c.lat, c.lon],
+// candidati nuovi: solo in locale (dati/scansione-privata.js non e versionato, online il file manca)
+const tuttiCandidati = SCANSIONE.candidati.concat(typeof SCANSIONE_PRIVATA === 'undefined' ? [] : SCANSIONE_PRIVATA);
+tuttiCandidati.forEach(c => L.circleMarker([c.lat, c.lon],
   {radius: 9, color: '#000', weight: 2, fillColor: COL_AFF[c.affidabilita], fillOpacity: 1})
   .bindPopup(`<b>${c.id} · ${c.affidabilita}</b><br>${c.nota}<br>${c.verifica ? '<b>Verifica:</b> ' + c.verifica + '<br>' : ''}
     ${c.foglio ? `<a href="${c.foglio}" target="_blank">Vedi rilievo, DSM, foto 2013 e 1954</a><br>` : ''}

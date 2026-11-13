@@ -3,3 +3,7 @@ schermate/
 __pycache__/
 dati/tessere-senese/
 dati/fogli/
+dati/scansione.json
+dati/scansione-privata.js
+dati/viste/D2_*
+dati/viste/D3_*
