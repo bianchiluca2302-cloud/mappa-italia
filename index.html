@@ -52,6 +52,7 @@
       <div><i class="s" style="border-color:#c0392b"></i>sito noto (OpenStreetMap)</div>
       <div><i class="s" style="border-color:#2471a3"></i>sito noto (Wikidata)</div>
     </div>
+    <button id="sblocca" hidden>🔒 Sblocca i candidati privati</button>
     <label><input type="checkbox" id="soloCandidati"> Solo candidati (nascondi tessere e siti noti)</label><br>
     <label><input type="checkbox" id="soloNuovi"> Solo reperti nuovi (nascondi siti noti e scartati)</label>
     <p id="stat"></p>
@@ -161,12 +162,13 @@ const rettTessere = SCANSIONE.tessere.map(t => L.rectangle([[t.lat, t.lon], [t.l
   {color: '#27ae60', weight: 1, fillOpacity: .12, interactive: false}).addTo(scansione));
 // candidati nuovi: solo in locale (dati/scansione-privata.js non e versionato, online il file manca)
 const tuttiCandidati = SCANSIONE.candidati.concat(typeof SCANSIONE_PRIVATA === 'undefined' ? [] : SCANSIONE_PRIVATA);
-const marcatori = tuttiCandidati.map(c => ({c, m: L.circleMarker([c.lat, c.lon],
+const creaMarcatore = c => ({c, m: L.circleMarker([c.lat, c.lon],
   {radius: 9, color: '#000', weight: 2, fillColor: COL_AFF[c.affidabilita], fillOpacity: 1})
   .bindPopup(`<b>${c.id} · ${c.affidabilita}</b><br>${c.nota}<br>${c.verifica ? '<b>Verifica:</b> ' + c.verifica + '<br>' : ''}
     ${c.foglio ? `<a href="${c.foglio}" target="_blank">Vedi rilievo, DSM, foto 2013 e 1954</a><br>` : ''}
     <i>Sito noto più vicino: ${c.noto_vicino.nome || c.noto_vicino.tipo} a ${c.noto_vicino.metri} m</i>`)
-  .addTo(scansione)}));
+  .addTo(scansione)});
+const marcatori = tuttiCandidati.map(creaMarcatore);
 const griglia = L.layerGroup(); // griglia 0,25 gradi: spenta di default, si accende dal menu
 const piccolo = matchMedia('(max-width:600px)').matches; // su telefono i livelli stanno in un'icona in alto a sinistra
 L.control.layers(null, {'LiDAR Toscana 1 m': lidarToscana, 'Copertura 1 m': copertura, 'Scansione (tessere e candidati)': scansione,
@@ -229,6 +231,26 @@ function conta() {
   $('stat').textContent = `Scansionati circa ${km2.toLocaleString('it-IT')} km² · ${pubblici} candidati pubblici`
     + (stato.candidati.length || mie ? ` · miei: ${stato.candidati.length} punti, ${mie} tessere` : '');
 }
+// Candidati privati online: dati/scansione-cifrata.json (AES-GCM, tools/cifra_privati.mjs) si apre con la password, la decifratura avviene qui nel browser
+if (typeof SCANSIONE_PRIVATA === 'undefined' && crypto.subtle) $('sblocca').hidden = false;
+const b64 = t => Uint8Array.from(atob(t), ch => ch.charCodeAt(0));
+$('sblocca').onclick = async () => {
+  const pw = prompt('Password dei candidati privati:');
+  if (!pw) return;
+  try {
+    const f = await (await fetch('dati/scansione-cifrata.json')).json();
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+    const chiave = await crypto.subtle.deriveKey({name: 'PBKDF2', salt: b64(f.sale), iterations: f.iter, hash: 'SHA-256'},
+      base, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
+    const chiaro = await crypto.subtle.decrypt({name: 'AES-GCM', iv: b64(f.iv)}, chiave, b64(f.dati));
+    JSON.parse(new TextDecoder().decode(chiaro)).forEach(c => {
+      delete c.foglio; // le viste dei candidati privati non sono online
+      marcatori.push(creaMarcatore(c));
+    });
+    $('sblocca').hidden = true; filtri();
+    $('msg').textContent = `Sbloccati ${marcatori.length} candidati in tutto.`;
+  } catch (e) { $('msg').textContent = 'Password sbagliata o file non leggibile.'; }
+};
 conta();
 // Pannello richiudibile (su telefono parte chiuso, per non coprire la mappa)
 $('apri').onclick = () => { const c = $('pannello').classList.toggle('chiuso'); $('apri').textContent = c ? '▸' : '▾'; };
