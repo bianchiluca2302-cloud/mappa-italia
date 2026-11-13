@@ -8,28 +8,65 @@
 <style>
   html,body{margin:0;height:100%;font:14px system-ui,sans-serif}
   #map{position:absolute;inset:0}
-  #pannello{position:absolute;z-index:1000;top:10px;right:10px;width:250px;background:#fffd;padding:10px;border-radius:8px;box-shadow:0 2px 8px #0004}
-  #pannello h1{font-size:15px;margin:0 0 6px}
-  #pannello button{margin:2px 2px 0 0}
-  .leg i{display:inline-block;width:12px;height:12px;margin-right:4px;vertical-align:-2px}
+  #pannello{position:absolute;z-index:1000;top:10px;right:10px;width:270px;max-height:calc(100% - 20px);overflow:auto;box-sizing:border-box;background:#fffe;padding:10px;border-radius:8px;box-shadow:0 2px 8px #0004}
+  #pannello h1{font-size:15px;margin:0;flex:1}
+  #pannello .testa{display:flex;align-items:center;gap:6px}
+  #pannello.chiuso .corpo{display:none}
+  #pannello .corpo>*{margin-top:8px}
+  #pannello button{margin:2px 2px 0 0;padding:6px 9px;cursor:pointer}
+  #pannello input[type=text],#pannello select{width:100%;box-sizing:border-box;padding:6px}
+  #cerca{display:flex;gap:4px}
+  #cerca button{margin:0}
+  .leg div{margin:2px 0}
+  .leg i{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-2px;box-sizing:border-box}
+  .leg i.c{border-radius:50%;border:2px solid #000}
+  .leg i.s{border-radius:50%;border:2px solid;background:#fff}
+  #stat{margin:0}
+  #aiuto{color:#a15;margin:0}
+  #msg{color:#555;min-height:1.2em}
+  #map.segna{cursor:crosshair}
+  button.attivo{background:#e80;color:#fff}
+  @media (max-width:600px){
+    #pannello{top:auto;bottom:0;left:0;right:0;width:auto;max-height:55%;border-radius:12px 12px 0 0}
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="pannello">
-  <h1>Mappa Italia — anomalie</h1>
-  <div class="leg">
-    <div><i style="background:#888"></i>da scansionare</div>
-    <div><i style="background:#3a7"></i>scansionata, niente</div>
-    <div><i style="background:#e80"></i>c'è un candidato</div>
+  <div class="testa">
+    <h1>Mappa Italia — anomalie</h1>
+    <button id="apri" title="Mostra o nascondi il pannello" aria-label="Mostra o nascondi il pannello">▾</button>
   </div>
-  <p id="stat"></p>
-  <small>Clic su una tessera: cambia stato. Maiusc+clic sulla mappa: aggiungi un candidato.</small><br>
-  <label for="sfondo"><b>Foto e carte</b></label>
-  <select id="sfondo" style="width:100%"></select>
-  <label>Trasparenza <input type="range" id="opacita" min="10" max="100" value="100" style="width:120px;vertical-align:middle"></label><br>
-  <button id="esporta">Esporta JSON</button>
-  <button id="azzera">Azzera</button>
+  <div class="corpo">
+    <form id="cerca">
+      <input type="text" id="q" placeholder="Cerca un luogo o lat, lon" aria-label="Cerca un luogo o inserisci coordinate">
+      <button>Vai</button>
+    </form>
+    <select id="zone" aria-label="Vai a una zona già scansionata"></select>
+    <div id="msg"></div>
+    <div class="leg">
+      <div><i style="background:#27ae6044;border:1px solid #27ae60"></i>zona già scansionata (1 km per tessera)</div>
+      <div><i class="c" style="background:#e67e22"></i>candidato di affidabilità media</div>
+      <div><i class="c" style="background:#f1c40f"></i>candidato di affidabilità bassa</div>
+      <div><i class="s" style="border-color:#c0392b"></i>sito noto (OpenStreetMap)</div>
+      <div><i class="s" style="border-color:#2471a3"></i>sito noto (Wikidata)</div>
+    </div>
+    <p id="stat"></p>
+    <p id="aiuto"></p>
+    <div>
+      <label for="sfondo"><b>Foto e carte</b></label>
+      <select id="sfondo"></select>
+      <label>Trasparenza <input type="range" id="opacita" min="10" max="100" value="100" style="width:150px;vertical-align:middle"></label>
+    </div>
+    <div>
+      <button id="segna" title="Poi tocca la mappa dove vuoi mettere il punto (su computer anche Maiusc+clic)">＋ Segna un punto</button>
+      <button id="link">Copia link a questa vista</button>
+      <button id="esporta">Esporta i miei segni</button>
+      <button id="azzera">Azzera i miei segni</button>
+    </div>
+    <small>I miei segni (punti e tessere della griglia 0,25°) restano solo in questo browser. La griglia si accende dal menu dei livelli.</small>
+  </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="dati/siti-noti.js"></script>
@@ -129,9 +166,10 @@ tuttiCandidati.forEach(c => L.circleMarker([c.lat, c.lon],
     <i>Sito noto più vicino: ${c.noto_vicino.nome || c.noto_vicino.tipo} a ${c.noto_vicino.metri} m</i>`)
   .addTo(scansione));
 const griglia = L.layerGroup(); // griglia 0,25 gradi: spenta di default, si accende dal menu
+const piccolo = matchMedia('(max-width:600px)').matches; // su telefono i livelli stanno in un'icona in alto a sinistra
 L.control.layers(null, {'LiDAR Toscana 1 m': lidarToscana, 'Copertura 1 m': copertura, 'Scansione (tessere e candidati)': scansione,
     'Griglia 0,25°': griglia, 'Siti noti (OSM)': sitiNoti, 'Siti noti (Wikidata)': sitiWikidata},
-  {collapsed: false, position: 'bottomright'}).addTo(map);
+  {collapsed: piccolo, position: piccolo ? 'topleft' : 'bottomright'}).addTo(map);
 
 const rettangoli = {};
 function stile(id) {
@@ -157,20 +195,65 @@ function aggiungiCandidato(c) {
     .bindPopup(c.nota || 'candidato').addTo(map);
 }
 stato.candidati.forEach(aggiungiCandidato);
+// Segnare un punto: tasto "Segna un punto" (anche al tocco) oppure Maiusc+clic
+const $ = id => document.getElementById(id);
+let modoSegna = false;
+function impostaSegna(on) { modoSegna = on; $('segna').classList.toggle('attivo', on); $('map').classList.toggle('segna', on);
+  $('msg').textContent = on ? 'Tocca la mappa dove vuoi mettere il punto.' : ''; }
+$('segna').onclick = () => impostaSegna(!modoSegna);
 map.on('click', e => {
-  if (!e.originalEvent.shiftKey) return;
-  const nota = prompt('Nota sul candidato (cosa si vede nel rilievo):') || '';
+  if (!e.originalEvent.shiftKey && !modoSegna) return;
+  impostaSegna(false);
+  const nota = prompt('Nota sul punto (cosa si vede nel rilievo):');
+  if (nota === null) return;
   const c = {lat: +e.latlng.lat.toFixed(5), lon: +e.latlng.lng.toFixed(5), nota};
   stato.candidati.push(c); aggiungiCandidato(c); salva(); conta();
 });
 
 function conta() {
-  const n = Object.keys(rettangoli).length;
-  const fatte = Object.values(stato.tessere).filter(v => v > 0).length;
-  document.getElementById('stat').textContent =
-    `${fatte}/${n} tessere viste · ${stato.candidati.length} candidati`;
+  const km2 = SCANSIONE.tessere.length, pubblici = SCANSIONE.candidati.length;
+  const mie = Object.values(stato.tessere).filter(v => v > 0).length;
+  $('stat').textContent = `Scansionati circa ${km2.toLocaleString('it-IT')} km² · ${pubblici} candidati pubblici`
+    + (stato.candidati.length || mie ? ` · miei: ${stato.candidati.length} punti, ${mie} tessere` : '');
 }
 conta();
+// Pannello richiudibile (su telefono parte chiuso, per non coprire la mappa)
+$('apri').onclick = () => { const c = $('pannello').classList.toggle('chiuso'); $('apri').textContent = c ? '▸' : '▾'; };
+if (piccolo) $('apri').onclick();
+// Ricerca: coordinate "lat, lon" oppure nome di un luogo (Nominatim, OpenStreetMap)
+const ZONE = [['Costa livornese e colline a est', 43.56, 10.40, 12], ['Val di Cecina e Volterra', 43.42, 10.73, 11],
+  ['Colline Metallifere', 43.10, 10.70, 11], ['Chianti', 43.45, 11.30, 11], ['Senese (Poggio Pelliccia)', 42.91, 11.01, 12],
+  ['Sesto Fiorentino e Quinto', 43.80, 11.14, 11], ['Cortona', 43.27, 11.98, 12], ['Chiusi', 43.03, 11.95, 12],
+  ['Murlo', 43.15, 11.39, 12], ['Vetulonia', 42.85, 10.96, 12], ['Sovana', 42.65, 11.65, 12], ['Marmini (Val di Cornia)', 43.40, 10.86, 12]];
+$('zone').add(new Option('Vai a una zona già scansionata…', ''));
+ZONE.forEach(([nome], i) => $('zone').add(new Option(nome, i)));
+$('zone').onchange = () => { const z = ZONE[$('zone').value]; if (z) map.setView([z[1], z[2]], z[3]); $('zone').value = ''; };
+$('cerca').onsubmit = async e => {
+  e.preventDefault();
+  const q = $('q').value.trim(); if (!q) return;
+  const m = q.match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
+  if (m) { map.setView([+m[1], +m[2]], 15); $('msg').textContent = ''; return; }
+  $('msg').textContent = 'Cerco…';
+  try {
+    const r = await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=' + encodeURIComponent(q))).json();
+    if (!r.length) { $('msg').textContent = 'Luogo non trovato.'; return; }
+    map.setView([+r[0].lat, +r[0].lon], 14); $('msg').textContent = r[0].display_name;
+  } catch (err) { $('msg').textContent = 'Ricerca non riuscita (rete?).'; }
+};
+// Link alla vista corrente (stesso formato di ?v=lat,lon,zoom) e avviso quando il rilievo LiDAR non si vede ancora
+$('link').onclick = async () => {
+  const c = map.getCenter(), u = location.origin + location.pathname + `?v=${c.lat.toFixed(5)},${c.lng.toFixed(5)},${map.getZoom()}`
+    + (sfondo.value ? '&f=' + sfondo.value : '');
+  try { await navigator.clipboard.writeText(u); $('msg').textContent = 'Link copiato.'; } catch (err) { prompt('Copia il link:', u); }
+};
+function aiuto() {
+  const z = map.getZoom();
+  $('aiuto').textContent = z < 11 && map.hasLayer(lidarToscana) ? 'Avvicinati (zoom 11 o più) per vedere il rilievo LiDAR in Toscana.' : '';
+}
+map.on('zoomend overlayadd overlayremove', aiuto); aiuto();
+// Trasparenza attiva solo quando c'è una foto o carta sopra il rilievo
+const aggiornaOpacita = () => { opacita.disabled = !sfondo.value; };
+sfondo.addEventListener('change', aggiornaOpacita); aggiornaOpacita();
 document.getElementById('esporta').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(stato, null, 1)], {type: 'application/json'}));
