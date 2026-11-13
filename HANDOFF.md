@@ -37,6 +37,13 @@
 - Non pubblicati (`.gitignore`): `dati/tessere/` e `schermate/`. Pubblicati i fogli di confronto in `dati/viste/` (dati CC BY-NC-SA con fonte citata).
 - Regola: coordinate di candidati NUOVI mai sul repo pubblico; oggi ci sono solo un sito noto e tre scartati.
 
+## Scansione allargata, Livorno (2026-11-13)
+- Luca ha chiesto di avvicinarsi a Livorno. Il LiDAR 1 m c'e solo a nord-est della citta (Montenero, colline livornesi, piana di Stagno): lungo la costa sotto 43.517N e a ovest di 10.317E le tessere sono vuote.
+- 15 tessere con dati tra 43.526-43.553N e 10.317-10.355E, guardate in 4 fogli 2x2 ridotti (`dati/fogli/`, non pubblicati). Metà dei fogli e centro urbano: poco da vedere.
+- 4 punti sospetti (C5-C8) controllati con DSM e foto 2013/1954: tutti scartati (campo arato, pendio con strada campestre, argine di vasca recente, piccola vasca). Totale finora: 8 candidati, 1 gia noto, 7 scartati, 0 nuovi.
+- Lezione: dal foglio ridotto le coordinate escono imprecise (C5 fuori centro di decine di metri). Per segnalare un candidato rifare il punto sulla tessera intera a 1000 px.
+- 16 tessere del Senese (42.864-42.900N, 10.975-11.024E) scaricate in `dati/tessere-senese/` ma NON guardate.
+
 ## Da fare, in ordine
 1. Fonte dati LiDAR/DTM italiana: Geoportale Nazionale (PST, DTM 1-2 m, copertura parziale) e geoportali regionali
    (Toscana, Emilia-Romagna, Veneto, Lombardia, Piemonte, Friuli...). Verificare licenza e come scaricare a tessere.
