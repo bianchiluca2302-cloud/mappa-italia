@@ -10,6 +10,7 @@ Esclusi: punti su opere moderne di OSM e punti "piatti" (laghetti, piazzali: DTM
 Servono numpy, scipy e Pillow.
 """
 import json
+import math
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -33,6 +34,20 @@ def esegui(*args):
     return r.returncode == 0
 
 
+def fondi_doppioni(punti):
+    """Tiene il punto di punteggio piu alto tra quelli vicini (distanza < raggio maggiore + 20 m); `fusi` conta gli scartati."""
+    tenuti = []
+    for p in punti:  # gia in ordine di punteggio decrescente
+        for q in tenuti:
+            d = math.hypot((p['lat'] - q['lat']) * 111_000, (p['lon'] - q['lon']) * 111_000 * math.cos(math.radians(p['lat'])))
+            if d < max(p['raggio'], q['raggio']) + 20:
+                q['fusi'] = q.get('fusi', 0) + 1
+                break
+        else:
+            tenuti.append(p)
+    return tenuti
+
+
 def main():
     args = [a for a in sys.argv[1:] if a != '--rifai']
     rifai = '--rifai' in sys.argv
@@ -50,6 +65,7 @@ def main():
     punti = json.loads((f if f.exists() else cart / 'rilevati.json').read_text(encoding='utf-8'))
     tenuti = [p for p in punti if p.get('esito', 'tenuto') == 'tenuto']
     tenuti.sort(key=lambda p: -p['punteggio'])
+    tenuti = fondi_doppioni(tenuti)
     usati = tenuti[:MAX_USO]
 
     def suolo(p):

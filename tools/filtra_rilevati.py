@@ -63,6 +63,8 @@ def catalogo(elementi):
     voci = []
     for e in elementi:
         t = e.get('tags', {})
+        if 'tomb' in t or t.get('historic') in ('archaeological_site', 'tomb', 'ruins'):  # tombe e rovine taggate anche building: non opere moderne
+            continue
         geoms = [e['geometry']] if e['type'] == 'way' and 'geometry' in e else \
             [m['geometry'] for m in e.get('members', []) if m.get('geometry') and m.get('role') in ('outer', '')]
         for g in geoms:
@@ -109,6 +111,12 @@ def main():
         if 'lat' in c:
             t = e.get('tags', {})
             storici.append((c['lat'], c['lon'], t.get('name') or t.get('historic') or t.get('site_type') or 'storico'))
+    for e in dati['moderno']:  # tombe e rovine taggate anche building: siti noti, la query storica puo mancarle
+        t = e.get('tags', {})
+        if ('tomb' in t or t.get('historic') in ('archaeological_site', 'tomb', 'ruins')) and e.get('geometry'):
+            g = e['geometry']
+            storici.append((sum(q['lat'] for q in g) / len(g), sum(q['lon'] for q in g) / len(g),
+                            t.get('name') or t.get('historic') or 'tomba'))
     conto = {}
     for p in punti:
         kx = 111_000 * math.cos(math.radians(p['lat']))
