@@ -115,7 +115,7 @@ const sitiWikidata = L.layerGroup(SITI_WIKIDATA.map(s =>
 // Dove c'e il LiDAR a 1 m (immagine di tutta la Toscana, dati/copertura-1m.png)
 const copertura = L.imageOverlay('dati/copertura-1m.png', TOSCANA, {opacity: .55});
 // Scansione: tessere guardate (verde) e candidati segnalati (dati/scansione.json, scritto da tools/registra_scansione.py)
-const COL_AFF = {'media': '#e67e22', 'bassa': '#f1c40f', 'molto bassa': '#95a5a6', 'gia noto': '#2e86c1', 'scartato': '#95a5a6', 'da verificare - media': '#e67e22'};
+const COL_AFF = {'media': '#e67e22', 'bassa': '#f1c40f', 'molto bassa': '#95a5a6', 'gia noto': '#2e86c1', 'scartato': '#95a5a6', 'da verificare - media': '#e67e22', 'da verificare - bassa': '#f1c40f'};
 const scansione = L.layerGroup().addTo(map);
 const DLAT = 1000 / 111000, DLON = 1000 / (111000 * Math.cos(42.9 * Math.PI / 180));
 SCANSIONE.tessere.forEach(t => L.rectangle([[t.lat, t.lon], [t.lat + DLAT, t.lon + DLON]],
