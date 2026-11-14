@@ -52,6 +52,7 @@
       <div><i class="s" style="border-color:#c0392b"></i>sito noto (OpenStreetMap)</div>
       <div><i class="s" style="border-color:#2471a3"></i>sito noto (Wikidata)</div>
     </div>
+    <div id="live" hidden></div>
     <button id="sblocca" hidden>🔒 Sblocca i candidati privati</button>
     <label><input type="checkbox" id="soloCandidati"> Solo candidati (nascondi tessere e siti noti)</label><br>
     <label><input type="checkbox" id="soloNuovi"> Solo reperti nuovi (nascondi siti noti e scartati)</label>
@@ -251,6 +252,41 @@ $('sblocca').onclick = async () => {
     $('msg').textContent = `Sbloccati ${marcatori.length} candidati in tutto.`;
   } catch (e) { $('msg').textContent = 'Password sbagliata o file non leggibile.'; }
 };
+// Scansione in diretta (solo in locale): tools/pipeline_blocco.py scrive dati/stato_scansione.json, qui lo si legge ogni 3 secondi
+const liveGruppo = L.layerGroup().addTo(map);
+let liveBlocco = null, liveFatti = -1, liveVisto = false;
+const bbox = b => [[b.lat0, b.lon0], [b.lat0 + b.righe * DLAT, b.lon0 + b.colonne * DLON]];
+function liveDisegna(st) {
+  if (st.fatti.length !== liveFatti) { // blocchi finiti: rettangolo blu e punti nuovi della regola C
+    liveFatti = st.fatti.length; liveGruppo.clearLayers();
+    st.fatti.forEach(b => {
+      L.rectangle(bbox(b), {color: '#2471a3', weight: 1, fillOpacity: .06, interactive: false}).addTo(liveGruppo);
+      b.nuovi.forEach(n => L.circleMarker([n.lat, n.lon], {radius: 6, color: '#8e44ad', weight: 2, fillOpacity: .7})
+        .bindPopup(`<b>${b.nome} #${n.posizione}</b> (regola C)<br>raggio ${n.raggio} m · punteggio ${n.punteggio}`).addTo(liveGruppo));
+    });
+  }
+  if (liveBlocco) { map.removeLayer(liveBlocco); liveBlocco = null; }
+  if (st.attivo) liveBlocco = L.rectangle(bbox(st), {color: '#e80', weight: 3, dashArray: '6 4', fillOpacity: .15, interactive: false}).addTo(map);
+}
+async function livePoll() {
+  try {
+    const r = await fetch('dati/stato_scansione.json?t=' + Date.now(), {cache: 'no-store'});
+    if (!r.ok) throw 0;
+    const st = await r.json(), el = $('live'), vecchio = Date.now() / 1000 - st.aggiornato > 600;
+    liveDisegna(st); el.hidden = false; liveVisto = true;
+    const min = Math.round((st.aggiornato - st.inizio) / 60);
+    if (st.errore) el.textContent = `⚠ Scansione ${st.nome} interrotta: ${st.errore}`;
+    else if (st.attivo && !vecchio) {
+      const av = st.avanzamento ? ` ${st.avanzamento[0]}/${st.avanzamento[1]}` : '';
+      el.textContent = `⏳ Scansione in corso: ${st.nome} · fase ${st.fase + 1}/${st.fasi.length} (${st.fasi[st.fase]}${av}) · ${min} min`;
+    } else {
+      const u = st.fatti[st.fatti.length - 1];
+      el.textContent = u ? `✔ Ultima scansione: ${u.nome}, ${u.nuovi.length} punti nuovi (regola C)` : 'Nessuna scansione in corso.';
+    }
+    setTimeout(livePoll, st.attivo && !vecchio ? 3000 : 15000);
+  } catch (e) { if (location.protocol !== 'https:') setTimeout(livePoll, 15000); } // file assente (sito online): niente riquadro
+}
+livePoll();
 conta();
 // Pannello richiudibile (su telefono parte chiuso, per non coprire la mappa)
 $('apri').onclick = () => { const c = $('pannello').classList.toggle('chiuso'); $('apri').textContent = c ? '▸' : '▾'; };
