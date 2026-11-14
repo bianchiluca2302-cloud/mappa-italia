@@ -18,6 +18,7 @@
   #cerca{display:flex;gap:4px}
   #cerca button{margin:0}
   .leg div{margin:2px 0}
+  .leg b{display:inline-block;margin-top:6px}
   .leg i{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-2px;box-sizing:border-box}
   .leg i.c{border-radius:50%;border:2px solid #000}
   .leg i.s{border-radius:50%;border:2px solid;background:#fff}
@@ -46,14 +47,23 @@
     <select id="zone" aria-label="Vai a una zona già scansionata"></select>
     <div id="msg"></div>
     <div class="leg">
+      <b>Legenda</b> <small>(uguale online e in locale)</small>
       <div><i style="background:#27ae6044;border:1px solid #27ae60"></i>zona già scansionata (1 km per tessera)</div>
-      <div><i class="c" style="background:#e67e22"></i>candidato di affidabilità media</div>
-      <div><i class="c" style="background:#f1c40f"></i>candidato di affidabilità bassa</div>
+      <div><i class="c" style="background:#2e86c1"></i>candidato che era già un sito noto</div>
+      <div><i class="c" style="background:#95a5a6"></i>candidato scartato dopo la verifica</div>
       <div><i class="s" style="border-color:#c0392b"></i>sito noto (OpenStreetMap)</div>
       <div><i class="s" style="border-color:#2471a3"></i>sito noto (Wikidata)</div>
+      <div><i class="c" style="background:#d81b60;border-color:#d81b60;width:10px;height:10px"></i>i miei segni (solo in questo browser)</div>
+      <b>🔒 Parte privata</b> <small id="statoPrivato">(si apre con la password)</small>
+      <div><i class="c" style="background:#e67e22"></i>candidato di affidabilità media</div>
+      <div><i class="c" style="background:#f1c40f"></i>candidato di affidabilità bassa</div>
+      <b>📡 In diretta</b> <small id="statoLive">(solo sul computer della scansione)</small>
+      <div><i style="background:#0002;border:2px dashed #000"></i>blocco che si sta scansionando ora</div>
+      <div><i style="background:#27ae6022;border:2px dashed #27ae60"></i>blocco finito, non ancora registrato</div>
+      <div><i class="c" style="background:#8e44ad;border-color:#8e44ad;width:10px;height:10px"></i>punto del rilevatore, non verificato</div>
     </div>
     <div id="live" hidden></div>
-    <button id="sblocca" hidden>🔒 Sblocca i candidati privati</button>
+    <button id="sblocca" hidden>🔒 Sblocca la parte privata</button>
     <label><input type="checkbox" id="soloCandidati"> Solo candidati (nascondi tessere e siti noti)</label><br>
     <label><input type="checkbox" id="soloNuovi"> Solo reperti nuovi (nascondi siti noti e scartati)</label>
     <p id="stat"></p>
@@ -75,8 +85,10 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="dati/siti-noti.js"></script>
 <script src="dati/siti-wikidata.js"></script>
-<script src="dati/scansione.js"></script>
-<script src="dati/scansione-privata.js" onerror="void 0"></script>
+<script>// i file della scansione cambiano spesso: ?t= evita che il browser mostri una copia vecchia
+for (const f of ['scansione', 'scansione-privata'])
+  document.write(`<script src="dati/${f}.js?t=${Date.now()}" onerror="void 0"><\/script>`);
+</script>
 <script>
 const LAT0 = 36.6, LAT1 = 47.1, LON0 = 6.6, LON1 = 18.6, PASSO = 0.25;
 const STATI = ['da scansionare', 'scansionata', 'candidato'];
@@ -207,7 +219,7 @@ function filtri() {
 }
 document.getElementById('soloNuovi').onchange = document.getElementById('soloCandidati').onchange = filtri;
 function aggiungiCandidato(c) {
-  L.circleMarker([c.lat, c.lon], {radius: 7, color: '#e80', fillOpacity: .8})
+  L.circleMarker([c.lat, c.lon], {radius: 6, color: '#d81b60', fillOpacity: .8})
     .bindPopup(c.nota || 'candidato').addTo(map);
 }
 stato.candidati.forEach(aggiungiCandidato);
@@ -234,12 +246,13 @@ function conta() {
 }
 // Candidati privati online: dati/scansione-cifrata.json (AES-GCM, tools/cifra_privati.mjs) si apre con la password, la decifratura avviene qui nel browser
 if (typeof SCANSIONE_PRIVATA === 'undefined' && crypto.subtle) $('sblocca').hidden = false;
+else if (typeof SCANSIONE_PRIVATA !== 'undefined') $('statoPrivato').textContent = `(aperta: ${SCANSIONE_PRIVATA.length} candidati)`;
 const b64 = t => Uint8Array.from(atob(t), ch => ch.charCodeAt(0));
 $('sblocca').onclick = async () => {
   const pw = prompt('Password dei candidati privati:');
   if (!pw) return;
   try {
-    const f = await (await fetch('dati/scansione-cifrata.json')).json();
+    const f = await (await fetch('dati/scansione-cifrata.json', {cache: 'no-store'})).json();
     const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
     const chiave = await crypto.subtle.deriveKey({name: 'PBKDF2', salt: b64(f.sale), iterations: f.iter, hash: 'SHA-256'},
       base, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
@@ -249,6 +262,7 @@ $('sblocca').onclick = async () => {
       marcatori.push(creaMarcatore(c));
     });
     $('sblocca').hidden = true; filtri();
+    $('statoPrivato').textContent = `(aperta: ${marcatori.length - SCANSIONE.candidati.length} candidati)`;
     $('msg').textContent = `Sbloccati ${marcatori.length} candidati in tutto.`;
   } catch (e) { $('msg').textContent = 'Password sbagliata o file non leggibile.'; }
 };
@@ -256,17 +270,20 @@ $('sblocca').onclick = async () => {
 const liveGruppo = L.layerGroup().addTo(map);
 let liveBlocco = null, liveFatti = -1, liveVisto = false;
 const bbox = b => [[b.lat0, b.lon0], [b.lat0 + b.righe * DLAT, b.lon0 + b.colonne * DLON]];
+// un blocco e gia registrato se ha tessere verdi in scansione.js (solo quelle con dato): allora le tessere bastano
+const registrato = b => { const [[a0, o0], [a1, o1]] = bbox(b);
+  return SCANSIONE.tessere.some(t => t.lat >= a0 - 1e-4 && t.lat < a1 && t.lon >= o0 - 1e-4 && t.lon < o1); };
 function liveDisegna(st) {
-  if (st.fatti.length !== liveFatti) { // blocchi finiti: rettangolo blu e punti nuovi della regola C
+  if (st.fatti.length !== liveFatti) { // blocchi finiti: verde tratteggiato se non ancora registrati, piu i punti viola della regola C
     liveFatti = st.fatti.length; liveGruppo.clearLayers();
     st.fatti.forEach(b => {
-      L.rectangle(bbox(b), {color: '#2471a3', weight: 1, fillOpacity: .06, interactive: false}).addTo(liveGruppo);
-      b.nuovi.forEach(n => L.circleMarker([n.lat, n.lon], {radius: 6, color: '#8e44ad', weight: 2, fillOpacity: .7})
-        .bindPopup(`<b>${b.nome} #${n.posizione}</b> (regola C)<br>raggio ${n.raggio} m · punteggio ${n.punteggio}`).addTo(liveGruppo));
+      if (!registrato(b)) L.rectangle(bbox(b), {color: '#27ae60', weight: 2, dashArray: '6 4', fillOpacity: .06, interactive: false}).addTo(liveGruppo);
+      b.nuovi.forEach(n => L.circleMarker([n.lat, n.lon], {radius: 5, color: '#8e44ad', weight: 2, fillOpacity: .7})
+        .bindPopup(`<b>${b.nome} #${n.posizione}</b> · punto del rilevatore (regola C), non verificato<br>raggio ${n.raggio} m · punteggio ${n.punteggio}`).addTo(liveGruppo));
     });
   }
   if (liveBlocco) { map.removeLayer(liveBlocco); liveBlocco = null; }
-  if (st.attivo) liveBlocco = L.rectangle(bbox(st), {color: '#e80', weight: 3, dashArray: '6 4', fillOpacity: .15, interactive: false}).addTo(map);
+  if (st.attivo) liveBlocco = L.rectangle(bbox(st), {color: '#000', weight: 3, dashArray: '6 4', fillOpacity: .12, interactive: false}).addTo(map);
 }
 async function livePoll() {
   try {
@@ -274,6 +291,8 @@ async function livePoll() {
     if (!r.ok) throw 0;
     const st = await r.json(), el = $('live'), vecchio = Date.now() / 1000 - st.aggiornato > 600;
     liveDisegna(st); el.hidden = false; liveVisto = true;
+    const punti = st.fatti.reduce((s, b) => s + b.nuovi.length, 0);
+    $('statoLive').textContent = `(attiva: ${st.fatti.length} blocchi finiti, ${punti} punti viola)`;
     const min = Math.round((st.aggiornato - st.inizio) / 60);
     if (st.errore) el.textContent = `⚠ Scansione ${st.nome} interrotta: ${st.errore}`;
     else if (st.attivo && !vecchio) {
