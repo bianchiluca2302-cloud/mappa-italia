@@ -24,3 +24,8 @@ dati/stato_scansione.json
 dati/stato_scansione.tmp
 dati/viste/A1_*
 dati/viste/T1_*
+dati/ricerche_storiche/
+
+dati/ricerche_lidar/
+dati/ricerche_siti/
+dati/ricerche_tumuli/
