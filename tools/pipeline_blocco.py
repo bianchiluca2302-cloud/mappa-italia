@@ -102,7 +102,7 @@ def lavora():
         except ValueError:
             pass
     st = {'attivo': True, 'nome': nome, 'lat0': float(lat0), 'lon0': float(lon0), 'righe': int(righe), 'colonne': int(colonne),
-          'fasi': FASI, 'fase': 0, 'avanzamento': None, 'inizio': time.time(), 'fatti': fatti[-19:]}
+          'fasi': FASI, 'fase': 0, 'avanzamento': None, 'inizio': time.time(), 'fatti': [b for b in fatti if b['nome'] != nome]}
 
     def fase(i, avanz=None):
         st['fase'], st['avanzamento'] = i, avanz

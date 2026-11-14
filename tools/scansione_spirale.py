@@ -1,6 +1,7 @@
 """Scansione a macchia d'olio: blocchi 6x6 km attorno a un centro, dal centro verso l'esterno, con pipeline_blocco.py.
 
-Uso: python -I tools/scansione_spirale.py PREFISSO LAT LON ANELLI [MAX_FOGLI=24]
+Uso: python -I tools/scansione_spirale.py PREFISSO LAT LON ANELLI [MAX_FOGLI=24] [DA_COLONNA_EST]
+Con DA_COLONNA_EST (es. 3) scansiona solo le colonne a est da quella in poi, fino a ANELLI, una colonna alla volta.
 Il blocco 0 e centrato su LAT,LON; l'anello k ha i blocchi a distanza k (in blocchi) dal centro, dal piu vicino al piu
 lontano. Per ogni blocco scarica le quote (scarica_quote.py), salta quelli con meno del 30% di dato (mare, fuori
 Toscana) e poi lancia la pipeline. Blocchi gia fatti (pipeline.json) si saltano: si puo rilanciare. Stato in
@@ -24,8 +25,9 @@ def main():
     fogli = sys.argv[5] if len(sys.argv) > 5 else '24'
     dlat = LATO_KM / 111
     dlon = LATO_KM / (111 * math.cos(math.radians(lat)))
-    celle = sorted(((i, j) for i in range(-anelli, anelli + 1) for j in range(-anelli, anelli + 1)),
-                   key=lambda c: (max(abs(c[0]), abs(c[1])), math.hypot(*c)))
+    est = int(sys.argv[6]) if len(sys.argv) > 6 else None  # solo colonne a est, da J=est in poi, una colonna alla volta
+    celle = sorted(((i, j) for i in range(-anelli, anelli + 1) for j in range(-anelli, anelli + 1) if est is None or j >= est),
+                   key=lambda c: (max(abs(c[0]), abs(c[1])), math.hypot(*c)) if est is None else (c[1], abs(c[0])))
     stato_f = BLOCCHI / f'spirale_{pref}.json'
     stato = json.loads(stato_f.read_text()) if stato_f.exists() else {}
     for i, j in celle:
